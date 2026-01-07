@@ -1,51 +1,25 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 )
-
-//define a home handler function which writes a byte slice
-//containing "hello from snippetbox" as the response body.
-
-func home(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Hello from snippetbox"))
-
-}
-
-// add a snippetview handler function
-func snippetView(w http.ResponseWriter, r *http.Request) {
-
-	// Extract the value of the id wildcard from the request using r.PathValue()
-	// and try to convert it to an integer using the strconv.Atoi() function. If
-	// it can't be converted to an integer, or the value is less than 1, we
-	// return a 404 page not found response.
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil || id < 1 {
-		http.NotFound(w, r)
-		return
-	}
-	// Use the fmt.Sprintf() function to interpolate the id value with a
-	// message, then write it as the HTTP response.
-	msg := fmt.Sprintf("Display a specific snippet with ID %d...", id)
-	w.Write([]byte(msg))
-}
-
-// add a snippetcreate handler function
-func snippetCreate(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("display a form for creating a new snippet..."))
-}
-func snippetCreatePost(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Save a new snippet..."))
-}
 
 func main() {
 	//use the http.NewServeMux() function to initialize a new servemux,
 	//then register the home function as the handler for the "/" URL pattern.
 
 	mux := http.NewServeMux()
+	// Create a file server which serves files out of the "./ui/static" directory.
+	// Note that the path given to the http.Dir function is relative to the project
+	// directory root.
+	fileServer := http.FileServer(http.Dir("C:/Users/chand/Desktop/snippetbox/ui/static"))
+
+	// Use the mux.Handle() function to register the file server as the handler for
+	// all URL paths that start with "/static/". For matching paths, we strip the
+	// "/static" prefix before the request reaches the file server.
+	mux.Handle("GET /static/", http.StripPrefix("/static", fileServer))
+
 	mux.HandleFunc("GET /{$}", home)
 
 	//Restricting subtree paths
