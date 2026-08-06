@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"html/template"
 	"net/http"
 	"strconv"
 
@@ -14,54 +13,26 @@ import (
 // *application.
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Server", "Go")
-
 	snippets, err := app.snippets.Latest()
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
+	// Call the newTemplateData() helper to get a templateData struct containing
+	// the 'default' data (which for now is just the current year), and add the
+	// snippets slice to it.
+	data := app.newTemplateData(r)
+	data.Snippets = snippets
 
-	files := []string{
-		"./ui/html/base.tmpl",
-		"./ui/html/partials/nav.tmpl",
-		"./ui/html/pages/home.tmpl",
-	}
-	ts, err := template.ParseFiles(files...)
-	if err != nil {
-		// Because the home handler is now a method against the application
-		// struct it can access its fields, including the structured logger. We'll
-		// use this to create a log entry at Error level containing the error
-		// message, also including the request method and URI as attributes to
-		// assist with debugging.
-		app.logger.Error(err.Error(), "method", r.Method, "uri", r.URL.RequestURI())
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-	// Create an instance of a templateData struct holding the slice of
-	// snippets.
-	data := templateData{
-		Snippets: snippets,
-	}
-	err = ts.ExecuteTemplate(w, "base", data)
-	if err != nil {
-		// And we also need to update the code here to use the structured logger
-		// too.
-		app.logger.Error(err.Error(), "method", r.Method, "uri", r.URL.RequestURI())
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
-	// Change the signature of the snippetView handler so it is defined as a method
-	// against *application.
+	// Pass the data to the render() helper as normal.
+	app.render(w, r, http.StatusOK, "home.html", data)
 }
-
 func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil || id < 1 {
 		http.NotFound(w, r)
 		return
 	}
-	// Use the SnippetModel's Get() method to retrieve the data for a
-	// specific record based on its ID. If no matching record is found,
-	// return a 404 Not Found response.
 	snippet, err := app.snippets.Get(id)
 	if err != nil {
 		if errors.Is(err, models.ErrNoRecord) {
@@ -71,33 +42,10 @@ func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	// Initialize a slice containing the paths to the view.tmpl file,
-	// plus the base layout and navigation partial that we made earlier.
-	files := []string{
-		"./ui/html/base.html",
-		"./ui/html/partials/nav.html",
-		"./ui/html/pages/view.html",
-	}
-	// Parse the template files...
-	ts, err := template.ParseFiles(files...)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-	// Create an instance of a templateData struct holding the snippet data.
-	data := templateData{
-		Snippet: snippet,
-	}
-	// And then execute them. Notice how we are passing in the snippet
-	// data (a models.Snippet struct) as the final parameter?
-	err = ts.ExecuteTemplate(w, "base", data)
-	if err != nil {
-		app.serverError(w, r, err)
-	}
-
-	// Write the snippet data as a plain-text HTTP response body.
-	//fmt.Fprintf(w, "%+v", snippet)
-
+	// And do the same thing again here...
+	data := app.newTemplateData(r)
+	data.Snippet = snippet
+	app.render(w, r, http.StatusOK, "view.html", data)
 }
 
 func (app *application) snippetCreate(w http.ResponseWriter, r *http.Request) {
