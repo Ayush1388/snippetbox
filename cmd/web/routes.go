@@ -1,9 +1,12 @@
 package main
 
-import "net/http"
+import (
+	"net/http"
 
-// The routes() method returns a servemux containing our application routes.
-func (app *application) routes() *http.ServeMux {
+	"github.com/justinas/alice"
+)
+
+func (app *application) routes() http.Handler {
 	mux := http.NewServeMux()
 	fileServer := http.FileServer(http.Dir("./ui/static/"))
 	mux.Handle("GET /static/", http.StripPrefix("/static", fileServer))
@@ -11,5 +14,8 @@ func (app *application) routes() *http.ServeMux {
 	mux.HandleFunc("GET /snippet/view/{id}", app.snippetView)
 	mux.HandleFunc("GET /snippet/create", app.snippetCreate)
 	mux.HandleFunc("POST /snippet/create", app.snippetCreatePost)
-	return mux
+	// Wrap the existing chain with the recoverPanic middleware.
+	standard := alice.New(app.recoverPanic, app.logRequest, commonHeaders)
+	// Return the 'standard' middleware chain followed by the servemux.
+	return standard.Then(mux)
 }
